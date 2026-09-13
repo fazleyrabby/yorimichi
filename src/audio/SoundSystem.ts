@@ -25,40 +25,75 @@ export class SoundSystem {
   private nextCricketTime = 2.0;
   private nightFactor = 0;
 
+  public onStateChange?: (isMuted: boolean) => void;
+
   constructor() {
-    // Unlock Web Audio on first user interaction
-    const unlockAudio = () => {
-      if (!this.isUnlocked) {
-        this.initAudioContext();
-        window.removeEventListener('pointerdown', unlockAudio);
-        window.removeEventListener('keydown', unlockAudio);
-      }
+    // 1. Prime the audio context and continuous generators immediately
+    this.initAudioContext();
+
+    // 2. Add capture-phase event listeners on user activation gestures
+    const unlockEvents = ['click', 'keydown', 'mousedown', 'pointerup', 'touchend', 'touchstart'];
+    const unlockHandler = () => {
+      this.resumeAudioContext();
     };
 
-    window.addEventListener('pointerdown', unlockAudio);
-    window.addEventListener('keydown', unlockAudio);
+    unlockEvents.forEach((evt) => {
+      window.addEventListener(evt, unlockHandler, { capture: true, passive: true });
+    });
   }
 
   private initAudioContext(): void {
     if (this.ctx) return;
 
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    this.ctx = new AudioCtx();
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      this.ctx = new AudioCtx();
 
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.85, this.ctx.currentTime);
+      this.masterGain.connect(this.ctx.destination);
+
+      this.initWindAmbience();
+      this.initWaterAmbience();
+      this.initBicycleRoll();
+
+      if (this.ctx.state === 'running') {
+        this.isUnlocked = true;
+        this.nextBirdTime = performance.now() * 0.001 + 3.0;
+      } else {
+        this.ctx.addEventListener('statechange', () => {
+          if (this.ctx?.state === 'running') {
+            this.isUnlocked = true;
+            this.nextBirdTime = performance.now() * 0.001 + 3.0;
+            if (this.masterGain && !this.isMuted) {
+              this.masterGain.gain.setTargetAtTime(0.85, this.ctx.currentTime, 0.05);
+            }
+            this.onStateChange?.(this.isMuted);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('AudioContext deferred:', e);
     }
+  }
 
-    this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.85, this.ctx.currentTime);
-    this.masterGain.connect(this.ctx.destination);
-
-    this.initWindAmbience();
-    this.initWaterAmbience();
-    this.initBicycleRoll();
-
-    this.isUnlocked = true;
-    this.nextBirdTime = performance.now() * 0.001 + 3.0;
+  public resumeAudioContext(): void {
+    if (!this.ctx) {
+      this.initAudioContext();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().then(() => {
+        this.isUnlocked = true;
+        this.nextBirdTime = performance.now() * 0.001 + 3.0;
+        if (this.masterGain && !this.isMuted) {
+          this.masterGain.gain.setTargetAtTime(0.85, this.ctx!.currentTime, 0.05);
+        }
+        this.onStateChange?.(this.isMuted);
+      }).catch(() => {});
+    } else if (this.ctx && this.ctx.state === 'running') {
+      this.isUnlocked = true;
+    }
   }
 
   // Create a 2-second looped pink-noise buffer
@@ -154,10 +189,8 @@ export class SoundSystem {
    * Two rapid resonant FM chimes in succession.
    */
   public playBicycleBell(): void {
-    if (!this.ctx || this.isMuted) {
-      if (!this.isUnlocked) this.initAudioContext();
-      if (!this.ctx || this.isMuted) return;
-    }
+    this.resumeAudioContext();
+    if (!this.ctx || this.isMuted || this.ctx.state !== 'running') return;
 
     const now = this.ctx.currentTime;
     const playChime = (time: number, freq: number) => {
@@ -202,7 +235,8 @@ export class SoundSystem {
    * Footstep on Dirt / Stone Road
    */
   public playFootstep(isStone: boolean = false): void {
-    if (!this.ctx || this.isMuted) return;
+    this.resumeAudioContext();
+    if (!this.ctx || this.isMuted || this.ctx.state !== 'running') return;
 
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
@@ -232,7 +266,7 @@ export class SoundSystem {
    * Procedural Bird Song in the distance
    */
   private playBirdChirp(): void {
-    if (!this.ctx || this.isMuted) return;
+    if (!this.ctx || this.isMuted || this.ctx.state !== 'running') return;
 
     const now = this.ctx.currentTime;
     const numNotes = Math.floor(Math.random() * 3) + 2;
@@ -264,7 +298,7 @@ export class SoundSystem {
    * Procedural Japanese Night Cricket (Suzumushi)
    */
   private playCricketChirp(): void {
-    if (!this.ctx || this.isMuted) return;
+    if (!this.ctx || this.isMuted || this.ctx.state !== 'running') return;
 
     const now = this.ctx.currentTime;
     const baseFreq = 4600 + Math.random() * 400;
@@ -300,7 +334,7 @@ export class SoundSystem {
   // ==========================================
 
   public update(_delta: number, time: number, playerPos: THREE.Vector3, isRidingBicycle: boolean, speed: number): void {
-    if (!this.ctx || !this.isUnlocked) return;
+    if (!this.ctx || !this.isUnlocked || this.ctx.state !== 'running') return;
 
     // 1. Dynamic Mountain Breeze modulation
     if (this.windGain) {
@@ -355,11 +389,25 @@ export class SoundSystem {
   // ==========================================
 
   public toggleMute(): boolean {
-    if (!this.ctx) this.initAudioContext();
-    this.isMuted = !this.isMuted;
-    if (this.masterGain && this.ctx) {
+    if (!this.ctx) {
+      this.initAudioContext();
+    }
+
+    // If context is still suspended or locked, the user clicked specifically to START sound.
+    // Ensure we unfreeze AudioContext and remain unmuted (isMuted = false) rather than muting!
+    if (!this.isUnlocked || (this.ctx && this.ctx.state !== 'running')) {
+      this.resumeAudioContext();
+      this.isMuted = false;
+    } else {
+      // Audio is already active, normal toggle behavior
+      this.isMuted = !this.isMuted;
+    }
+
+    if (this.masterGain && this.ctx && this.ctx.state === 'running') {
       this.masterGain.gain.setTargetAtTime(this.isMuted ? 0 : 0.85, this.ctx.currentTime, 0.05);
     }
+
+    this.onStateChange?.(this.isMuted);
     return this.isMuted;
   }
 

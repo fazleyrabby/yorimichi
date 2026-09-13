@@ -160,14 +160,30 @@ export class Game {
     const iconOn = btn.querySelector('.audio-on') as HTMLElement | null;
     const iconOff = btn.querySelector('.audio-off') as HTMLElement | null;
 
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isMuted = this.soundSystem.toggleMute();
+    const updateIcons = (isMuted: boolean) => {
       if (iconOn && iconOff) {
         iconOn.style.display = isMuted ? 'none' : 'block';
         iconOff.style.display = isMuted ? 'block' : 'none';
       }
+    };
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isMuted = this.soundSystem.toggleMute();
+      updateIcons(isMuted);
     });
+
+    // Keyboard shortcut M for toggling mute
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyM' && !e.repeat) {
+        const isMuted = this.soundSystem.toggleMute();
+        updateIcons(isMuted);
+      }
+    });
+
+    this.soundSystem.onStateChange = (isMuted) => {
+      updateIcons(isMuted);
+    };
   }
 
   private initCameraUI(): void {
