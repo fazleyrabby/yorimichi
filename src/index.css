@@ -1,0 +1,437 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #121815;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ========================================================
+   AOE CLASSIC ISOMETRIC HUD FRAMEWORK
+   ======================================================== */
+
+#hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.2rem 1.6rem;
+  z-index: 10;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* --------------------------------------------------------
+   1. TOP AOE BANNER (VITALS, ERA PLACARD, UTILITIES)
+   -------------------------------------------------------- */
+
+.aoe-top-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+  position: relative;
+}
+
+/* Top-Left Vitals Bar */
+.aoe-vitals-group {
+  display: flex;
+  gap: 0.6rem;
+  pointer-events: auto;
+}
+
+.aoe-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(180deg, #2e231c 0%, #1a130f 100%);
+  border: 2px solid #5a4432;
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(212, 175, 55, 0.25);
+}
+
+.aoe-badge-icon {
+  font-size: 1.1rem;
+}
+
+.aoe-badge-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.aoe-badge-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.55rem;
+  letter-spacing: 0.12rem;
+  color: #c2ab87;
+  font-weight: 700;
+}
+
+.aoe-badge-val {
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f7eed8;
+  letter-spacing: 0.05rem;
+}
+
+/* Top-Center Age / District Header Placard */
+.aoe-district-header {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.aoe-header-ornament {
+  width: 18px;
+  height: 38px;
+  background: #3e2d21;
+  border: 2px solid #846845;
+}
+
+.left-crest {
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  clip-path: polygon(0% 50%, 100% 0%, 100% 100%);
+}
+
+.right-crest {
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+}
+
+.aoe-header-content {
+  background: linear-gradient(180deg, #2b1f17 0%, #150f0c 100%);
+  border-top: 2px solid #a88448;
+  border-bottom: 2px solid #a88448;
+  padding: 0.4rem 1.8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 230, 150, 0.3);
+}
+
+.aoe-header-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+
+.aoe-kanji {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: #f3edd8;
+  letter-spacing: 0.2rem;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.aoe-roman {
+  font-family: 'Cinzel', serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.25rem;
+  color: #d8be92;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.aoe-header-sub {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.14rem;
+  color: #9e8d75;
+  margin-top: 0.15rem;
+}
+
+.aoe-sub-dot {
+  color: #c9a456;
+  font-size: 0.65rem;
+}
+
+/* Top-Right Sound & Camera Buttons */
+.aoe-top-right {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.aoe-seal-btn {
+  background: linear-gradient(180deg, #38281d 0%, #1d140e 100%);
+  border: 2px solid #846845;
+  border-radius: 50%;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e5d7ba;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 220, 120, 0.25);
+  transition: all 0.2s ease;
+}
+
+.aoe-seal-btn:hover {
+  border-color: #d4af37;
+  color: #fff;
+  transform: scale(1.06);
+}
+
+/* --------------------------------------------------------
+   2. BOTTOM AOE BAR (COMMAND DECK & DIAMOND MINIMAP)
+   -------------------------------------------------------- */
+
+.aoe-bottom-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: 100%;
+  position: relative;
+}
+
+/* Command Deck / Unit Card */
+.aoe-command-deck {
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.aoe-deck-crest {
+  width: 14px;
+  height: 52px;
+  background: #35251a;
+  border: 2px solid #7a5c3e;
+}
+
+.aoe-deck-crest.left {
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  clip-path: polygon(0% 50%, 100% 0%, 100% 100%);
+}
+
+.aoe-deck-crest.right {
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+}
+
+.aoe-deck-inner {
+  background: linear-gradient(180deg, #271c14 0%, #140d09 100%);
+  border-top: 2px solid #8c693a;
+  border-bottom: 2px solid #8c693a;
+  padding: 0.5rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(212, 175, 55, 0.2);
+}
+
+.aoe-deck-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding-right: 0.8rem;
+  border-right: 1px solid rgba(140, 105, 58, 0.4);
+}
+
+.aoe-profile-frame {
+  width: 2.2rem;
+  height: 2.2rem;
+  background: #19120c;
+  border: 1.5px solid #a88448;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+.aoe-profile-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.aoe-profile-name {
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.15rem;
+  color: #eeddbb;
+}
+
+.aoe-profile-desc {
+  font-size: 0.65rem;
+  color: #9f8e77;
+}
+
+.aoe-actions-grid {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.aoe-action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #32241a 0%, #1c140e 100%);
+  border: 1px solid #6b4f34;
+  border-radius: 4px;
+  padding: 0.35rem 0.55rem;
+  min-width: 3.4rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: all 0.15s ease;
+}
+
+.aoe-action-card:hover {
+  border-color: #c9a456;
+  background: linear-gradient(180deg, #3e2d21 0%, #241a12 100%);
+}
+
+.aoe-action-card kbd {
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #ffea9f;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  margin-bottom: 0.15rem;
+}
+
+.aoe-action-card span {
+  font-size: 0.58rem;
+  color: #c8b79d;
+  font-weight: 500;
+}
+
+/* --------------------------------------------------------
+   3. THE ICONIC DIAMOND MINIMAP (AOE RHOMBUS RADAR)
+   -------------------------------------------------------- */
+
+.aoe-minimap-wrapper {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  pointer-events: auto;
+  width: 170px;
+  height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aoe-diamond-bezel {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  transform: rotate(45deg);
+  background: #19120c;
+  border: 3px solid #8c693a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), inset 0 0 12px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.aoe-diamond-inner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 180px;
+  height: 180px;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#aoe-minimap-canvas {
+  width: 180px;
+  height: 180px;
+  display: block;
+}
+
+.aoe-compass-needle {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  transform: rotate(-45deg);
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #ffea9f;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+  pointer-events: none;
+}
+
+/* Floating Recenter Badge */
+.aoe-recenter-pill {
+  position: absolute;
+  top: -44px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #3d2b17, #1f140b);
+  border: 1.5px solid #d4af37;
+  border-radius: 20px;
+  padding: 0.32rem 0.85rem;
+  color: #ffea9f;
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 10px rgba(212, 175, 55, 0.35);
+  pointer-events: auto;
+  transition: all 0.18s ease;
+  animation: aoe-pulse-glow 2s infinite ease-in-out;
+}
+
+.aoe-recenter-pill:hover {
+  background: linear-gradient(180deg, #4d361c, #2a1b0e);
+  border-color: #ffd700;
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7), 0 0 16px rgba(255, 215, 0, 0.55);
+}
+
+@keyframes aoe-pulse-glow {
+  0%, 100% { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 8px rgba(212, 175, 55, 0.25); }
+  50% { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 16px rgba(212, 175, 55, 0.6); }
+}
+
+#game-canvas {
+  cursor: grab;
+}
+
+#game-canvas:active {
+  cursor: grabbing;
+}
