@@ -9,9 +9,11 @@ import { Player } from '../player/Player';
 import { World } from '../world/World';
 import { GameLoop } from './GameLoop';
 import { WORLD_CONFIG } from '../config/world';
+import { VISUAL_CONFIG } from '../config/visual';
 import { GhibliPassSystem } from '../rendering/GhibliPass';
 import { SoundSystem } from '../audio/SoundSystem';
 import { Minimap } from '../ui/Minimap';
+import { Season } from '../types';
 
 export class Game {
   public canvas: HTMLCanvasElement;
@@ -32,6 +34,9 @@ export class Game {
   public isNight: boolean = false;
   public dayNightBlend: number = 0;
   public targetDayNightBlend: number = 0;
+  public currentSeason: Season = 'spring';
+  public targetSeason: Season = 'spring';
+  public seasonBlend: number = 1.0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -83,6 +88,8 @@ export class Game {
     this.initAudioUI();
     this.initCameraUI();
     this.initTimeUI();
+    this.initSeasonUI();
+    this.initVisitorCounter();
     
     // Position player at world start
     const startX = WORLD_CONFIG.playerStart.x;
@@ -234,6 +241,23 @@ export class Game {
     };
   }
 
+  private updateBannerSubtitle(): void {
+    const subtitle = document.querySelector('.aoe-banner-sub');
+    if (!subtitle) return;
+    const cfg = VISUAL_CONFIG.seasons[this.targetSeason];
+    if (this.isNight) {
+      const nightTitles: Record<Season, string> = {
+        spring: '✦ MOONLIT SAKURA • CRICKET CHIRPS & SPRING MIST ✦',
+        summer: '✦ SUMMER STARLIGHT • FIREFLIES & WARM BREEZE ✦',
+        autumn: '✦ AUTUMN HARVEST MOON • CHIMES & FALLEN LEAVES ✦',
+        winter: '✦ SILENT WINTER NIGHT • LANTERNS & FALLING SNOW ✦',
+      };
+      subtitle.textContent = nightTitles[this.targetSeason];
+    } else {
+      subtitle.textContent = cfg ? cfg.subtitle : '✦ MORNING TRANQUILITY • GENTLE BREEZE ✦';
+    }
+  }
+
   private initTimeUI(): void {
     const btn = document.getElementById('time-toggle');
     const toggleNight = (forceNight?: boolean) => {
@@ -243,12 +267,7 @@ export class Game {
         btn.textContent = this.isNight ? '🌙' : '☀️';
         btn.setAttribute('title', this.isNight ? 'Switch to Day (N)' : 'Switch to Night (N)');
       }
-      const subtitle = document.querySelector('.aoe-banner-sub');
-      if (subtitle) {
-        subtitle.textContent = this.isNight
-          ? '✦ MOONLIT TRANQUILITY • CRICKET CHIRPS ✦'
-          : '✦ MORNING TRANQUILITY • GENTLE BREEZE ✦';
-      }
+      this.updateBannerSubtitle();
     };
 
     if (btn) {
@@ -272,6 +291,79 @@ export class Game {
     }
   }
 
+  private initSeasonUI(): void {
+    const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter'];
+    const btn = document.getElementById('season-toggle');
+
+    const updateButtonUI = () => {
+      if (btn) {
+        const cfg = VISUAL_CONFIG.seasons[this.targetSeason];
+        btn.textContent = cfg.icon;
+        btn.setAttribute('title', `Season: ${cfg.name} (Press K to cycle)`);
+      }
+    };
+
+    const cycleSeason = () => {
+      const nextIdx = (seasons.indexOf(this.targetSeason) + 1) % seasons.length;
+      this.setSeason(seasons[nextIdx]);
+    };
+
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cycleSeason();
+      });
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyK' && !e.repeat) {
+        cycleSeason();
+      }
+    });
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const seasonParam = urlParams.get('season') as Season | null;
+    if (seasonParam && seasons.includes(seasonParam)) {
+      this.setSeason(seasonParam, true);
+    } else if (urlParams.has('winter')) {
+      this.setSeason('winter', true);
+    } else if (urlParams.has('autumn')) {
+      this.setSeason('autumn', true);
+    } else if (urlParams.has('summer')) {
+      this.setSeason('summer', true);
+    } else {
+      updateButtonUI();
+    }
+  }
+
+  public setSeason(season: Season, instant: boolean = false): void {
+    if (season === this.targetSeason && this.seasonBlend >= 1.0) return;
+    this.currentSeason = this.targetSeason;
+    this.targetSeason = season;
+    this.seasonBlend = instant ? 1.0 : 0.0;
+
+    const btn = document.getElementById('season-toggle');
+    if (btn) {
+      const cfg = VISUAL_CONFIG.seasons[this.targetSeason];
+      btn.textContent = cfg.icon;
+      btn.setAttribute('title', `Season: ${cfg.name} (Press K to cycle)`);
+    }
+
+    this.updateBannerSubtitle();
+
+    if (instant) {
+      this.applySeasonBlend(this.currentSeason, this.targetSeason, 1.0);
+    }
+  }
+
+  public applySeasonBlend(from: Season, to: Season, factor: number): void {
+    this.world.setSeasonBlend(from, to, factor);
+    this.particles.setSeasonBlend(from, to, factor);
+    this.atmosphere.setSeasonBlend(from, to, factor);
+    this.lighting.setSeasonBlend(from, to, factor, this.player.position);
+    this.soundSystem.setSeason(factor > 0.5 ? to : from);
+  }
+
   public applyDayNightBlend(blend: number): void {
     this.lighting.setDayNightBlend(blend, this.player.position);
     this.atmosphere.setDayNightBlend(blend);
@@ -279,6 +371,34 @@ export class Game {
     this.particles.setDayNightBlend(blend);
     this.world.setDayNightBlend(blend);
     this.soundSystem.setDayNightBlend(blend);
+  }
+
+  private async initVisitorCounter(): Promise<void> {
+    const el = document.getElementById('aoe-visitor-count');
+    if (!el) return;
+
+    const NAMESPACE = 'yorimichi-experience';
+    const KEY = 'pilgrims';
+    const SESSION_KEY = 'yorimichi_visited_session';
+
+    // Check if the user already visited during this browser session
+    const hasVisited = sessionStorage.getItem(SESSION_KEY);
+    const endpoint = hasVisited
+      ? `https://api.counterapi.dev/v1/${NAMESPACE}/${KEY}`
+      : `https://api.counterapi.dev/v1/${NAMESPACE}/${KEY}/up`;
+
+    try {
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data && typeof data.count === 'number') {
+        el.textContent = Number(data.count).toLocaleString();
+        sessionStorage.setItem(SESSION_KEY, 'true');
+      }
+    } catch {
+      // Fallback display if offline or API blocked
+      el.textContent = '1,280+';
+    }
   }
 
   private onCameraModeChange(mode: CameraMode): void {
@@ -342,9 +462,15 @@ export class Game {
       if (romanEl) romanEl.textContent = 'SUMMIT PANORAMA OVERLOOK';
       if (subDistrictEl) subDistrictEl.innerHTML = '<span class="aoe-sub-dot" style="color:#38bdf8">✦</span> PANORAMIC VALLEY VISTA • FULL WORLD VIEW <span class="aoe-sub-dot" style="color:#38bdf8">✦</span>';
     } else {
-      if (kanjiEl) kanjiEl.textContent = '寄り道';
-      if (romanEl) romanEl.textContent = 'KAMISATO HAMLET';
-      if (subDistrictEl) subDistrictEl.innerHTML = '<span class="aoe-sub-dot">✦</span> MORNING TRANQUILITY • GENTLE BREEZE <span class="aoe-sub-dot">✦</span>';
+      const cfg = VISUAL_CONFIG.seasons[this.targetSeason];
+      if (kanjiEl) kanjiEl.textContent = cfg ? `寄り道 • ${cfg.kanji}` : '寄り道';
+      if (romanEl) romanEl.textContent = `KAMISATO HAMLET • ${cfg ? cfg.name : 'SPRING'}`;
+      if (subDistrictEl) {
+        const text = this.isNight
+          ? `MOONLIT ${cfg ? cfg.name : 'SPRING'} • TRANQUILITY`
+          : (cfg ? cfg.subtitle.replace(/✦/g, '').trim() : 'MORNING TRANQUILITY • GENTLE BREEZE');
+        subDistrictEl.innerHTML = `<span class="aoe-sub-dot">✦</span> ${text} <span class="aoe-sub-dot">✦</span>`;
+      }
     }
 
     // 5. Command Deck Profile & Bicycle Action Prompt
@@ -458,6 +584,15 @@ export class Game {
         this.dayNightBlend = Math.max(this.targetDayNightBlend, this.dayNightBlend - step);
       }
       this.applyDayNightBlend(this.dayNightBlend);
+    }
+
+    // Update Season smooth crossfade
+    if (this.seasonBlend < 1.0) {
+      this.seasonBlend = Math.min(1.0, this.seasonBlend + delta * 0.65);
+      this.applySeasonBlend(this.currentSeason, this.targetSeason, this.seasonBlend);
+      if (this.seasonBlend >= 1.0) {
+        this.currentSeason = this.targetSeason;
+      }
     }
 
     // 5. Update Lighting follow

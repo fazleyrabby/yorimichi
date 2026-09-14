@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { VISUAL_CONFIG } from '../config/visual';
+import { Season } from '../types';
 
 export class LightingSystem {
   public sunLight: THREE.DirectionalLight;
@@ -36,7 +37,7 @@ export class LightingSystem {
     this.sunLight.shadow.camera.top = d;
     this.sunLight.shadow.camera.bottom = -d;
     this.sunLight.shadow.camera.near = 10;
-    this.sunLight.shadow.camera.far = 280;
+    this.sunLight.shadow.camera.far = 320;
 
     this.shadowTarget = new THREE.Object3D();
     this.scene.add(this.shadowTarget);
@@ -47,28 +48,47 @@ export class LightingSystem {
   }
 
   private currentNightFactor = 0;
+  private fromSeason: Season = 'spring';
+  private toSeason: Season = 'spring';
+  private seasonFactor = 0;
+
+  public setSeasonBlend(fromSeason: Season, toSeason: Season, factor: number, playerPos: THREE.Vector3): void {
+    this.fromSeason = fromSeason;
+    this.toSeason = toSeason;
+    this.seasonFactor = THREE.MathUtils.clamp(factor, 0, 1);
+    this.setDayNightBlend(this.currentNightFactor, playerPos);
+  }
 
   public setDayNightBlend(nightFactor: number, playerPos: THREE.Vector3): void {
     this.currentNightFactor = THREE.MathUtils.clamp(nightFactor, 0, 1);
-    const day = VISUAL_CONFIG.dayNight.day;
+
+    const sFrom = VISUAL_CONFIG.seasons[this.fromSeason];
+    const sTo = VISUAL_CONFIG.seasons[this.toSeason];
+    const sf = this.seasonFactor;
+
+    // Seasonal Daytime Lighting
+    const seasonSunColor = new THREE.Color(sFrom.sunColor).lerp(new THREE.Color(sTo.sunColor), sf);
+    const sunIntensityMult = THREE.MathUtils.lerp(sFrom.sunIntensityMultiplier, sTo.sunIntensityMultiplier, sf);
+    const daySunIntensity = VISUAL_CONFIG.lighting.sunIntensity * sunIntensityMult;
+
+    const daySkyColor = new THREE.Color(sFrom.ambientSkyColor).lerp(new THREE.Color(sTo.ambientSkyColor), sf);
+    const dayGroundColor = new THREE.Color(sFrom.ambientGroundColor).lerp(new THREE.Color(sTo.ambientGroundColor), sf);
+    const dayAmbientIntensity = VISUAL_CONFIG.lighting.ambientIntensity;
+
+    // Nocturnal parameters
     const night = VISUAL_CONFIG.dayNight.night;
-
-    // Interpolate directional light (Sun -> Moon)
-    const daySunColor = new THREE.Color(day.sunColor);
     const nightMoonColor = new THREE.Color(night.sunColor);
-    this.sunLight.color.copy(daySunColor).lerp(nightMoonColor, this.currentNightFactor);
-    this.sunLight.intensity = THREE.MathUtils.lerp(day.sunIntensity, night.sunIntensity, this.currentNightFactor);
-
-    // Interpolate ambient hemisphere light
-    const daySkyColor = new THREE.Color(day.ambientSkyColor);
     const nightSkyColor = new THREE.Color(night.ambientSkyColor);
-    this.hemiLight.color.copy(daySkyColor).lerp(nightSkyColor, this.currentNightFactor);
-
-    const dayGroundColor = new THREE.Color(day.ambientGroundColor);
     const nightGroundColor = new THREE.Color(night.ambientGroundColor);
-    this.hemiLight.groundColor.copy(dayGroundColor).lerp(nightGroundColor, this.currentNightFactor);
 
-    this.hemiLight.intensity = THREE.MathUtils.lerp(day.ambientIntensity, night.ambientIntensity, this.currentNightFactor);
+    // Interpolate Sun -> Moon
+    this.sunLight.color.copy(seasonSunColor).lerp(nightMoonColor, this.currentNightFactor);
+    this.sunLight.intensity = THREE.MathUtils.lerp(daySunIntensity, night.sunIntensity, this.currentNightFactor);
+
+    // Interpolate Hemisphere ambient
+    this.hemiLight.color.copy(daySkyColor).lerp(nightSkyColor, this.currentNightFactor);
+    this.hemiLight.groundColor.copy(dayGroundColor).lerp(nightGroundColor, this.currentNightFactor);
+    this.hemiLight.intensity = THREE.MathUtils.lerp(dayAmbientIntensity, night.ambientIntensity, this.currentNightFactor);
 
     this.update(playerPos);
   }

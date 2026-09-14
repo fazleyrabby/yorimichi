@@ -766,6 +766,26 @@ export class AssetGenerator {
     rightRoof.receiveShadow = true;
     group.add(rightRoof);
 
+    // Winter Snow Blankets on Japanese House Roof
+    const snowPlaneGeo = new THREE.BoxGeometry(roofSlopeLen + 0.45, 0.22, roofSpanZ + 0.25);
+    const leftSnow = new THREE.Mesh(snowPlaneGeo, M.snowRoofMaterial);
+    leftSnow.position.set(-roofSpanX * 0.25, roofBaseY + roofPitchH * 0.48 + 0.15, 0);
+    leftSnow.rotation.z = slopeAngle;
+    leftSnow.castShadow = true;
+    leftSnow.receiveShadow = true;
+    group.add(leftSnow);
+
+    const rightSnow = new THREE.Mesh(snowPlaneGeo, M.snowRoofMaterial);
+    rightSnow.position.set(roofSpanX * 0.25, roofBaseY + roofPitchH * 0.48 + 0.15, 0);
+    rightSnow.rotation.z = -slopeAngle;
+    rightSnow.castShadow = true;
+    rightSnow.receiveShadow = true;
+    group.add(rightSnow);
+
+    const ridgeSnow = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.26, roofSpanZ + 0.35), M.snowRoofMaterial);
+    ridgeSnow.position.set(0, roofBaseY + roofPitchH + 0.28, 0);
+    group.add(ridgeSnow);
+
     // Ridge capping beam
     const ridgeGeo = new THREE.BoxGeometry(0.5, 0.4, roofSpanZ + 0.3);
     const ridge = new THREE.Mesh(ridgeGeo, M.timberDarkMaterial);
@@ -853,6 +873,11 @@ export class AssetGenerator {
     cap.position.set(0, height + 0.42, 0);
     cap.castShadow = true;
     group.add(cap);
+
+    // Winter Snow Blanket on Torii Top Lintel
+    const toriiSnow = new THREE.Mesh(new THREE.BoxGeometry(kasagiLength + 0.15, 0.16, 0.64), M.snowRoofMaterial);
+    toriiSnow.position.set(0, height + 0.54, 0);
+    group.add(toriiSnow);
 
     // Center plaque
     const plaqueGeo = new THREE.BoxGeometry(0.5, 0.65, 0.22);
@@ -950,6 +975,24 @@ export class AssetGenerator {
     rRight.rotation.z = -slopeAng;
     rRight.castShadow = true;
     group.add(rRight);
+
+    // Winter Snow Blankets on Shrine Roof
+    const shrineSnowGeo = new THREE.BoxGeometry(slopeLen + 0.38, 0.2, roofSpanZ + 0.22);
+    const sLeft = new THREE.Mesh(shrineSnowGeo, M.snowRoofMaterial);
+    sLeft.position.set(-roofSpanX * 0.25, roofY + roofPitch * 0.48 + 0.14, 0);
+    sLeft.rotation.z = slopeAng;
+    sLeft.castShadow = true;
+    group.add(sLeft);
+
+    const sRight = new THREE.Mesh(shrineSnowGeo, M.snowRoofMaterial);
+    sRight.position.set(roofSpanX * 0.25, roofY + roofPitch * 0.48 + 0.14, 0);
+    sRight.rotation.z = -slopeAng;
+    sRight.castShadow = true;
+    group.add(sRight);
+
+    const sRidgeSnow = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.24, roofSpanZ + 0.3), M.snowRoofMaterial);
+    sRidgeSnow.position.set(0, roofY + roofPitch + 0.22, 0);
+    group.add(sRidgeSnow);
 
     // Chigi (forked roof finials on ridge)
     [-roofSpanZ * 0.42, roofSpanZ * 0.42].forEach(rz => {
@@ -1081,6 +1124,11 @@ export class AssetGenerator {
     roof.position.y = 2.02;
     roof.castShadow = true;
     group.add(roof);
+
+    // Winter Snow Cap on Stone Lantern
+    const snowCap = new THREE.Mesh(new THREE.ConeGeometry(0.88, 0.28, 6), M.snowRoofMaterial);
+    snowCap.position.y = 2.14;
+    group.add(snowCap);
 
     const finialGeo = new THREE.SphereGeometry(0.14, 6, 6);
     const finial = new THREE.Mesh(finialGeo, M.stoneLanternMaterial);
@@ -1280,6 +1328,16 @@ export class AssetGenerator {
     roofMesh.receiveShadow = true;
     group.add(roofMesh);
 
+    // Winter Snow Blanket on Thatched Cottage Roof
+    const snowRoofGeo = new THREE.ConeGeometry((width + roofOverhang * 2 + 0.16) * 0.72, roofHeight * 1.02, 4);
+    snowRoofGeo.rotateY(Math.PI / 4);
+    snowRoofGeo.scale(1.0, 1.0, length / width);
+    const snowRoof = new THREE.Mesh(snowRoofGeo, M.snowRoofMaterial);
+    snowRoof.position.set(0, roofBaseY + roofHeight * 0.5 + 0.12, 0);
+    snowRoof.castShadow = true;
+    snowRoof.receiveShadow = true;
+    group.add(snowRoof);
+
     // Thatch roof underside shadow fringe
     const fringeGeo = new THREE.BoxGeometry(width + roofOverhang * 1.8, 0.35, length + roofOverhang * 1.8);
     const fringeMesh = new THREE.Mesh(fringeGeo, M.thatchedRoofShadowMaterial);
@@ -1323,6 +1381,11 @@ export class AssetGenerator {
     cap.position.set(chimneyX, chimney.position.y + chimneyH * 0.5 + 0.11, chimneyZ);
     cap.castShadow = true;
     group.add(cap);
+
+    // Winter Chimney Snow Cap
+    const chimneySnow = new THREE.Mesh(new THREE.BoxGeometry(chimneyW + 0.32, 0.22, chimneyW + 0.32), M.snowRoofMaterial);
+    chimneySnow.position.set(chimneyX, cap.position.y + 0.2, chimneyZ);
+    group.add(chimneySnow);
 
     // Smoke Anchor Object
     const smokeAnchor = new THREE.Object3D();
@@ -1444,11 +1507,26 @@ export class AssetGenerator {
     roof.castShadow = true;
     group.add(roof);
 
+    // Winter Thatched Roof Snow Blanket on Millhouse
+    const millSnowGeo = new THREE.ConeGeometry((millW + 1.55) * 0.72, roofH * 1.02, 4);
+    millSnowGeo.rotateY(Math.PI / 4);
+    millSnowGeo.scale(1.0, 1.0, millL / millW);
+    const millSnow = new THREE.Mesh(millSnowGeo, M.snowRoofMaterial);
+    millSnow.position.set(0, stoneH + timberH + roofH * 0.48 + 0.12, 0);
+    millSnow.castShadow = true;
+    millSnow.receiveShadow = true;
+    group.add(millSnow);
+
     // Chimney on millhouse
     const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.85, 3.8, 0.85), M.chimneyStoneMaterial);
     chimney.position.set(millW * 0.32, stoneH + timberH + 1.8, -millL * 0.25);
     chimney.castShadow = true;
     group.add(chimney);
+
+    // Watermill chimney snow cap
+    const millChimneySnow = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.22, 1.05), M.snowRoofMaterial);
+    millChimneySnow.position.set(millW * 0.32, stoneH + timberH + 3.75, -millL * 0.25);
+    group.add(millChimneySnow);
 
     const smokeAnchor = new THREE.Object3D();
     smokeAnchor.name = 'chimney_top';
@@ -1564,6 +1642,12 @@ export class AssetGenerator {
       stripe.castShadow = true;
       group.add(stripe);
     }
+
+    // Winter Snow Blanket on Market Awning
+    const awningSnow = new THREE.Mesh(new THREE.BoxGeometry(stallW + 0.35, 0.1, awningLen + 0.08), M.snowRoofMaterial);
+    awningSnow.position.set(0, postH + 0.22, 0.1);
+    awningSnow.rotation.x = 0.18;
+    group.add(awningSnow);
 
     // Crates of Apples & Cabbages on Counter
     const crateGeo = new THREE.BoxGeometry(0.85, 0.35, 0.65);

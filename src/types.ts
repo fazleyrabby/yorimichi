@@ -36,3 +36,5 @@ export interface InstancedItem {
   matrix: THREE.Matrix4;
   color?: THREE.Color;
 }
+
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter';

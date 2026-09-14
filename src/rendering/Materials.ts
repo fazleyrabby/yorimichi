@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { VISUAL_CONFIG } from '../config/visual';
+import { Season } from '../types';
 
 export class MaterialLibrary {
   // Shared materials
@@ -52,9 +53,21 @@ export class MaterialLibrary {
   public awningCreamMaterial: THREE.MeshStandardMaterial;
   public chimneyStoneMaterial: THREE.MeshStandardMaterial;
   public broadleafHighlightMaterial: THREE.MeshStandardMaterial;
+  public snowRoofMaterial: THREE.MeshStandardMaterial;
 
   constructor() {
     const P = VISUAL_CONFIG.palette;
+
+    // Winter Snow Blanket Material for Roofs, Chimneys, Lanterns & Torii Caps
+    this.snowRoofMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf4f9fd,
+      roughness: 0.94,
+      metalness: 0.02,
+      transparent: true,
+      opacity: 0.0,
+      visible: false,
+      flatShading: true,
+    });
 
     // Terrain with vertex colors for smooth blending between grass, paths, and rocks
     this.terrainMaterial = new THREE.MeshStandardMaterial({
@@ -671,6 +684,77 @@ export class MaterialLibrary {
     const dayWf = new THREE.Color(0x0088b8);
     const nightWf = new THREE.Color(0x004c78);
     this.waterfallMaterial.uniforms.uColor.value.copy(dayWf).lerp(nightWf, this.nightFactor);
+
+    // Snow on roofs night moonlit color
+    const daySnow = new THREE.Color(0xf4f9fd);
+    const nightSnow = new THREE.Color(0x8fa4ba);
+    this.snowRoofMaterial.color.copy(daySnow).lerp(nightSnow, this.nightFactor * 0.65);
+  }
+
+  public setSeasonBlend(fromSeason: Season, toSeason: Season, factor: number): void {
+    const t = THREE.MathUtils.clamp(factor, 0, 1);
+    const fromF = VISUAL_CONFIG.seasons[fromSeason].foliage;
+    const toF = VISUAL_CONFIG.seasons[toSeason].foliage;
+
+    // Winter Roof Snow Blanket
+    const fromSnow = fromSeason === 'winter' ? 1.0 : 0.0;
+    const toSnow = toSeason === 'winter' ? 1.0 : 0.0;
+    const snowFactor = THREE.MathUtils.lerp(fromSnow, toSnow, t);
+
+    this.snowRoofMaterial.opacity = snowFactor * 0.98;
+    this.snowRoofMaterial.visible = this.snowRoofMaterial.opacity > 0.01;
+
+    // Apply cold frost to thatched roofs and charcoal slate tiles in winter
+    const defaultRoofTile = new THREE.Color(VISUAL_CONFIG.palette.roofTileCharcoal);
+    const winterRoofTile = new THREE.Color(0x657585); // Frost-dusted slate
+    this.roofTileMaterial.color.copy(defaultRoofTile).lerp(winterRoofTile, snowFactor * 0.65);
+
+    const defaultThatch = new THREE.Color(VISUAL_CONFIG.palette.thatchedRoofGold);
+    const winterThatch = new THREE.Color(0xc2cfdc); // Frost-dusted thatch straw
+    this.thatchedRoofMaterial.color.copy(defaultThatch).lerp(winterThatch, snowFactor * 0.85);
+
+    const defaultThatchShadow = new THREE.Color(VISUAL_CONFIG.palette.thatchedRoofShadow);
+    const winterThatchShadow = new THREE.Color(0x889baa);
+    this.thatchedRoofShadowMaterial.color.copy(defaultThatchShadow).lerp(winterThatchShadow, snowFactor * 0.85);
+
+    // Conifers & Pines
+    const pineFrom = new THREE.Color(fromF.pine);
+    const pineTo = new THREE.Color(toF.pine);
+    this.pineFoliageDark.color.copy(pineFrom).lerp(pineTo, t);
+    this.pineFoliageLight.color.copy(pineFrom).lerp(pineTo, t).offsetHSL(0.02, 0.05, 0.08);
+
+    // Broadleaf trees
+    const broadFrom = new THREE.Color(fromF.broadleaf);
+    const broadTo = new THREE.Color(toF.broadleaf);
+    this.broadleafFoliage.color.copy(broadFrom).lerp(broadTo, t);
+    this.broadleafFoliageLight.color.copy(broadFrom).lerp(broadTo, t).offsetHSL(0.01, 0.04, 0.07);
+
+    // Sakura blossoms
+    const sakuraFrom = new THREE.Color(fromF.sakura);
+    const sakuraTo = new THREE.Color(toF.sakura);
+    this.cherryBlossomFoliage.color.copy(sakuraFrom).lerp(sakuraTo, t);
+
+    // Japanese Maples (Momiji)
+    const mapleFrom = new THREE.Color(fromF.maple);
+    const mapleTo = new THREE.Color(toF.maple);
+    this.autumnFoliage.color.copy(mapleFrom).lerp(mapleTo, t);
+
+    // Bushes & Meadow Grass
+    const bushFrom = new THREE.Color(fromF.bush);
+    const bushTo = new THREE.Color(toF.bush);
+    this.bushMaterial.color.copy(bushFrom).lerp(bushTo, t);
+    this.grassMaterial.color.copy(bushFrom).lerp(bushTo, t);
+
+    // Crops & Agricultural Props
+    if (toSeason === 'autumn' || fromSeason === 'autumn') {
+      const autumnWheat = new THREE.Color(0xd48b28);
+      const normalWheat = new THREE.Color(0xe5b045);
+      this.wheatMaterial.color.copy(normalWheat).lerp(autumnWheat, t);
+    } else if (toSeason === 'winter' || fromSeason === 'winter') {
+      const winterWheat = new THREE.Color(0xcddce8);
+      const normalWheat = new THREE.Color(0xe5b045);
+      this.wheatMaterial.color.copy(normalWheat).lerp(winterWheat, t);
+    }
   }
 
   public update(time: number): void {

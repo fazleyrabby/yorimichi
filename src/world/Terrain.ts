@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { MaterialLibrary } from '../rendering/Materials';
 import { VISUAL_CONFIG } from '../config/visual';
 import { WORLD_CONFIG } from '../config/world';
-import { TerrainQuery } from '../types';
+import { TerrainQuery, Season } from '../types';
 
 export class Terrain implements TerrainQuery {
   public mesh: THREE.Mesh;
@@ -11,6 +11,8 @@ export class Terrain implements TerrainQuery {
   private depth: number;
   private segments: number;
   private heightData: Float32Array;
+  private activeColorArray!: Float32Array;
+  private seasonalColorBuffers!: Record<Season, Float32Array>;
 
   constructor(materials: MaterialLibrary) {
     this.width = WORLD_CONFIG.size;
@@ -334,97 +336,145 @@ export class Terrain implements TerrainQuery {
     const pos = this.geometry.attributes.position;
     const norm = this.geometry.attributes.normal;
     const count = pos.count;
-    const colors = new Float32Array(count * 3);
 
-    const P = VISUAL_CONFIG.palette;
-    const grassMeadow = new THREE.Color(P.grassMeadow);
-    const grassLush = new THREE.Color(P.grassLush);
-    const grassDry = new THREE.Color(P.grassDry);
-    const rockCliff = new THREE.Color(P.rockCliff); // Warm limestone
-    const rockMoss = new THREE.Color(P.rockMoss);
-    const shoreSand = new THREE.Color(P.shoreSand);
-    const dirtPath = new THREE.Color(P.dirtPath);
-    const plazaStone = new THREE.Color(P.dirtPathLight); // Light flagstone plaza
+    this.seasonalColorBuffers = {
+      spring: new Float32Array(count * 3),
+      summer: new Float32Array(count * 3),
+      autumn: new Float32Array(count * 3),
+      winter: new Float32Array(count * 3),
+    };
 
+    const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter'];
     const tempColor = new THREE.Color();
+    const leafColor = new THREE.Color(0xb84224); // Fallen Autumn leaves
+    const snowColor = new THREE.Color(0xf6faff); // Pure Winter snow
+    const snowShadow = new THREE.Color(0xd2e2ee); // Shaded Winter snowdrift
 
-    for (let i = 0; i < count; i++) {
-      const x = pos.getX(i);
-      const y = pos.getY(i);
-      const z = pos.getZ(i);
+    for (const season of seasons) {
+      const colors = this.seasonalColorBuffers[season];
+      const sCfg = VISUAL_CONFIG.seasons[season].terrain;
 
-      const ny = norm.getY(i);
-      const slope = Math.acos(Math.max(-1, Math.min(1, ny))); // angle with vertical
+      const grassMeadow = new THREE.Color(sCfg.grassMeadow);
+      const grassLush = new THREE.Color(sCfg.grassLush);
+      const grassDry = new THREE.Color(sCfg.grassDry);
+      const rockCliff = new THREE.Color(sCfg.cliff);
+      const rockMoss = new THREE.Color(VISUAL_CONFIG.palette.rockMoss);
+      const shoreSand = new THREE.Color(VISUAL_CONFIG.palette.shoreSand);
+      const dirtPath = new THREE.Color(VISUAL_CONFIG.palette.dirtPath);
+      const plazaStone = new THREE.Color(VISUAL_CONFIG.palette.dirtPathLight);
 
-      // 1. Base meadow variation (AOE warm olive/emerald grass)
-      const meadowVar = Math.sin(x * 0.15 + z * 0.12) * 0.5 + 0.5;
-      tempColor.copy(grassMeadow).lerp(grassLush, meadowVar);
+      for (let i = 0; i < count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        const z = pos.getZ(i);
 
-      // Higher dry mountain grass
-      if (y > 10.0) {
-        const t = Math.min((y - 10.0) / 10.0, 1.0);
-        tempColor.lerp(grassDry, t * 0.5);
+        const ny = norm.getY(i);
+        const slope = Math.acos(Math.max(-1, Math.min(1, ny))); // angle with vertical
+
+        // 1. Base meadow variation
+        const meadowVar = Math.sin(x * 0.15 + z * 0.12) * 0.5 + 0.5;
+        tempColor.copy(grassMeadow).lerp(grassLush, meadowVar);
+
+        // Higher dry mountain grass
+        if (y > 10.0) {
+          const t = Math.min((y - 10.0) / 10.0, 1.0);
+          tempColor.lerp(grassDry, t * 0.5);
+        }
+
+        // 2. Steep cliff rock
+        const roadDistForCliff = this.getDistanceToRoads(x, z);
+        const cliffThreshold = roadDistForCliff < 20.0 ? 1.15 : 0.82;
+        if (slope > cliffThreshold && y > 13.0) {
+          const rockFactor = Math.min((slope - cliffThreshold) / 0.20, 1.0);
+          tempColor.lerp(rockCliff, rockFactor * 0.75);
+        } else if (slope > 0.50 && y < 5.0) {
+          const bankFactor = Math.min((slope - 0.50) / 0.30, 1.0);
+          tempColor.lerp(rockMoss, bankFactor * 0.55);
+        }
+
+        // 2b. Mountain Waterfall Gorge Wet Rock Face (x: -8, z in [-62, -45.0])
+        if (Math.abs(x - (-8.0)) < 7.5 && z >= -62.0 && z <= -45.0) {
+          const distX = Math.abs(x - (-8.0));
+          const wetFactor = Math.max(0, 1.0 - distX / 7.5);
+          const wetCanyonTone = rockCliff.clone().multiplyScalar(0.65).lerp(rockMoss, 0.45);
+          tempColor.lerp(wetCanyonTone, Math.pow(wetFactor, 0.8) * 0.92);
+        }
+
+        // 3. Lake and stream shoreline sand/gravel
+        if (y < WORLD_CONFIG.water.waterLevel + 0.8) {
+          const waterProximity = Math.max(0, 1.0 - (y - (WORLD_CONFIG.water.waterLevel - 1.2)) / 2.0);
+          tempColor.lerp(shoreSand, waterProximity * 0.9);
+        }
+
+        // 4. Central Village Agora / Paved Stone Plaza (x: 21, z: -2)
+        const plazaDist = Math.hypot(x - 21, z - (-2));
+        if (plazaDist < 13.0) {
+          const pFactor = Math.max(0, 1.0 - plazaDist / 13.0);
+          const stoneNoise = Math.sin(x * 1.8) * Math.cos(z * 1.8) * 0.08;
+          const pColor = plazaStone.clone().addScalar(stoneNoise);
+          tempColor.lerp(pColor, Math.pow(pFactor, 0.7) * 0.95);
+        }
+
+        // 5. Dirt Road and Pathway Splines
+        const roadDist = this.getDistanceToRoads(x, z);
+        if (roadDist < 4.2) {
+          const pathFactor = Math.pow(Math.max(0, 1.0 - roadDist / 4.2), 1.2);
+          const roadTone = y > 9.0 ? dirtPath.clone().lerp(plazaStone, 0.35) : dirtPath;
+          tempColor.lerp(roadTone, pathFactor * 0.92);
+        }
+
+        // 6. Summit Viewpoint Terrace Flagstone Surface
+        const vpDist = Math.hypot(x - (-8.0), z - (-60.0));
+        if (vpDist < 7.0) {
+          const vpFactor = Math.max(0, 1.0 - vpDist / 7.0);
+          tempColor.lerp(plazaStone, Math.pow(vpFactor, 0.8) * 0.85);
+        }
+
+        // Seasonal Details:
+        // A. Autumn fallen leaf patches along roads and near trees
+        if (season === 'autumn') {
+          const leafNoise = Math.sin(x * 0.8 + z * 0.7) * Math.cos(x * 0.4 - z * 0.6);
+          if (leafNoise > 0.45 && roadDist > 2.0 && roadDist < 9.0) {
+            tempColor.lerp(leafColor, (leafNoise - 0.45) * 0.65);
+          }
+        }
+
+        // B. Winter snow blanket
+        if (season === 'winter') {
+          // Flat areas catch heavy snow; sheer vertical cliffs shed snow
+          const snowCatch = Math.pow(Math.max(0, ny), 1.6);
+          const peakBonus = Math.max(0, Math.min(1.0, (y - 7.0) / 10.0));
+          const winterTone = tempColor.clone().lerp(snowShadow, 0.75).lerp(snowColor, peakBonus * 0.65 + snowCatch * 0.35);
+          
+          // Waterfall chute keeps some dark wet rocks exposed
+          const isGorge = Math.abs(x - (-8.0)) < 4.2 && z >= -58.0 && z <= -46.0;
+          const snowAmount = isGorge ? 0.35 : Math.max(0.72, snowCatch);
+          tempColor.lerp(winterTone, snowAmount);
+        }
+
+        colors[i * 3 + 0] = tempColor.r;
+        colors[i * 3 + 1] = tempColor.g;
+        colors[i * 3 + 2] = tempColor.b;
       }
-
-      // 2. Steep cliff rock (Only true steep bluffs show exposed rock; slopes stay lush green)
-      const roadDistForCliff = this.getDistanceToRoads(x, z);
-      const cliffThreshold = roadDistForCliff < 20.0 ? 1.15 : 0.82;
-      if (slope > cliffThreshold && y > 13.0) {
-        const rockFactor = Math.min((slope - cliffThreshold) / 0.20, 1.0);
-        tempColor.lerp(rockCliff, rockFactor * 0.75);
-      } else if (slope > 0.50 && y < 5.0) {
-        // Riverside slopes: lush mossy bank and earthy gravel
-        const bankFactor = Math.min((slope - 0.50) / 0.30, 1.0);
-        tempColor.lerp(rockMoss, bankFactor * 0.55);
-      }
-
-      // 2b. Natural Mountain Waterfall Gorge Wet Rock Face & Canyon Bed (x: -8, z in [-62, -45.0])
-      if (Math.abs(x - (-8.0)) < 7.5 && z >= -62.0 && z <= -45.0) {
-        const distX = Math.abs(x - (-8.0));
-        const wetFactor = Math.max(0, 1.0 - distX / 7.5);
-        // Rich wet rock, dark cliff stone, and lush deep moss - never dry grass!
-        const wetCanyonTone = rockCliff.clone().multiplyScalar(0.65).lerp(rockMoss, 0.45);
-        tempColor.lerp(wetCanyonTone, Math.pow(wetFactor, 0.8) * 0.92);
-      }
-
-      // 3. Lake and stream shoreline sand/gravel
-      if (y < WORLD_CONFIG.water.waterLevel + 0.8) {
-        const waterProximity = Math.max(0, 1.0 - (y - (WORLD_CONFIG.water.waterLevel - 1.2)) / 2.0);
-        tempColor.lerp(shoreSand, waterProximity * 0.9);
-      }
-
-      // 4. Central Village Agora / Paved Stone Plaza (x: 21, z: -2)
-      const plazaDist = Math.hypot(x - 21, z - (-2));
-      if (plazaDist < 13.0) {
-        const pFactor = Math.max(0, 1.0 - plazaDist / 13.0);
-        // Stone flagstone texture noise
-        const stoneNoise = Math.sin(x * 1.8) * Math.cos(z * 1.8) * 0.08;
-        const pColor = plazaStone.clone().addScalar(stoneNoise);
-        tempColor.lerp(pColor, Math.pow(pFactor, 0.7) * 0.95);
-      }
-
-      // 5. Dirt Road and Pathway Splines (blended smoothly into terrain)
-      const roadDist = this.getDistanceToRoads(x, z);
-      if (roadDist < 4.2) {
-        const pathFactor = Math.pow(Math.max(0, 1.0 - roadDist / 4.2), 1.2);
-        // Alpine mountain passes have warm crushed trail gravel; lowland roads have rich loam dirt
-        const roadTone = y > 9.0 ? dirtPath.clone().lerp(plazaStone, 0.35) : dirtPath;
-        tempColor.lerp(roadTone, pathFactor * 0.92);
-      }
-
-      // 6. Summit Viewpoint Terrace Flagstone Surface at (-8, -60)
-      const vpDist = Math.hypot(x - (-8.0), z - (-60.0));
-      if (vpDist < 7.0) {
-        const vpFactor = Math.max(0, 1.0 - vpDist / 7.0);
-        tempColor.lerp(plazaStone, Math.pow(vpFactor, 0.8) * 0.85);
-      }
-
-      colors[i * 3 + 0] = tempColor.r;
-      colors[i * 3 + 1] = tempColor.g;
-      colors[i * 3 + 2] = tempColor.b;
     }
 
-    this.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // Initialize active color array from Spring
+    this.activeColorArray = new Float32Array(this.seasonalColorBuffers.spring);
+    this.geometry.setAttribute('color', new THREE.BufferAttribute(this.activeColorArray, 3));
+  }
+
+  public setSeasonBlend(fromSeason: Season, toSeason: Season, factor: number): void {
+    if (!this.seasonalColorBuffers || !this.activeColorArray) return;
+    const t = THREE.MathUtils.clamp(factor, 0, 1);
+    const bufFrom = this.seasonalColorBuffers[fromSeason];
+    const bufTo = this.seasonalColorBuffers[toSeason];
+    if (!bufFrom || !bufTo) return;
+
+    const len = this.activeColorArray.length;
+    for (let i = 0; i < len; i++) {
+      this.activeColorArray[i] = bufFrom[i] * (1.0 - t) + bufTo[i] * t;
+    }
+    this.geometry.attributes.color.needsUpdate = true;
   }
 
   private getDistanceToRoads(x: number, z: number): number {

@@ -435,3 +435,216 @@ html, body, #app {
 #game-canvas:active {
   cursor: grabbing;
 }
+
+/* ========================================================
+   RESPONSIVE HUD LAYOUT & BREAKPOINTS
+   ======================================================== */
+
+/* 1. Large Laptops / Desktop Narrowing (<= 1360px) */
+@media (max-width: 1360px) {
+  #hud {
+    padding: 1rem 1.2rem;
+  }
+  .aoe-badge {
+    padding: 0.3rem 0.55rem;
+    gap: 0.4rem;
+  }
+  .aoe-badge-icon {
+    font-size: 0.95rem;
+  }
+  .aoe-badge-label {
+    font-size: 0.5rem;
+  }
+  .aoe-badge-val {
+    font-size: 0.7rem;
+  }
+  .aoe-header-content {
+    padding: 0.35rem 1.4rem;
+  }
+  .aoe-kanji {
+    font-size: 1.05rem;
+  }
+  .aoe-roman {
+    font-size: 0.76rem;
+    letter-spacing: 0.18rem;
+  }
+  .aoe-deck-inner {
+    padding: 0.4rem 0.9rem;
+    gap: 0.9rem;
+  }
+  .aoe-action-card {
+    min-width: 3.1rem;
+    padding: 0.28rem 0.45rem;
+  }
+}
+
+/* 2. Standard Laptops & Tablets Landscape (<= 1180px) */
+@media (max-width: 1180px) {
+  .aoe-district-header {
+    max-width: 440px;
+  }
+  .aoe-header-content {
+    padding: 0.3rem 1rem;
+  }
+  .aoe-kanji {
+    font-size: 0.95rem;
+  }
+  .aoe-roman {
+    font-size: 0.7rem;
+    letter-spacing: 0.12rem;
+  }
+  .aoe-header-sub {
+    font-size: 0.52rem;
+    letter-spacing: 0.08rem;
+  }
+  .aoe-vitals-group {
+    gap: 0.35rem;
+  }
+  .aoe-seal-btn {
+    width: 2.3rem;
+    height: 2.3rem;
+  }
+  /* Hide secondary redundant action cards so command deck never collides with minimap */
+  .aoe-action-card:nth-child(n+6) {
+    display: none;
+  }
+  .aoe-minimap-wrapper {
+    width: 145px;
+    height: 145px;
+  }
+  .aoe-diamond-bezel {
+    width: 105px;
+    height: 105px;
+  }
+  .aoe-diamond-inner {
+    width: 155px;
+    height: 155px;
+  }
+}
+
+/* 3. Tablets & Small Screens (<= 980px) */
+@media (max-width: 980px) {
+  .aoe-top-bar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "title title"
+      "vitals tools";
+    row-gap: 0.55rem;
+  }
+  .aoe-district-header {
+    grid-area: title;
+    position: static;
+    transform: none;
+    justify-self: center;
+    max-width: 100%;
+  }
+  .aoe-vitals-group {
+    grid-area: vitals;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
+  .aoe-top-right {
+    grid-area: tools;
+    justify-self: end;
+  }
+  .aoe-bottom-bar {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .aoe-command-deck {
+    margin: 0;
+  }
+  /* Keep only the essential movement & bicycle action cards */
+  .aoe-action-card:nth-child(n+3) {
+    display: none;
+  }
+  .aoe-minimap-wrapper {
+    position: fixed;
+    right: 0.8rem;
+    bottom: 0.8rem;
+    width: 120px;
+    height: 120px;
+  }
+  .aoe-diamond-bezel {
+    width: 85px;
+    height: 85px;
+  }
+  .aoe-diamond-inner {
+    width: 130px;
+    height: 130px;
+  }
+}
+
+/* 4. Mobile Devices (<= 640px) */
+@media (max-width: 640px) {
+  #hud {
+    padding: 0.5rem 0.6rem;
+  }
+  .aoe-badge-label {
+    display: none;
+  }
+  .aoe-badge {
+    padding: 0.25rem 0.45rem;
+    gap: 0.3rem;
+  }
+  .aoe-badge-val {
+    font-size: 0.68rem;
+  }
+  .aoe-header-sub {
+    display: none;
+  }
+  .aoe-header-ornament {
+    height: 28px;
+    width: 12px;
+  }
+  .aoe-header-content {
+    padding: 0.25rem 0.8rem;
+  }
+  .aoe-kanji {
+    font-size: 0.88rem;
+  }
+  .aoe-roman {
+    font-size: 0.65rem;
+    letter-spacing: 0.1rem;
+  }
+  .aoe-seal-btn {
+    width: 2.1rem;
+    height: 2.1rem;
+  }
+  .aoe-seal-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+  .aoe-actions-grid {
+    display: none;
+  }
+  .aoe-deck-profile {
+    border-right: none;
+    padding-right: 0;
+  }
+  .aoe-deck-crest {
+    height: 40px;
+    width: 10px;
+  }
+  .aoe-minimap-wrapper {
+    right: 0.4rem;
+    bottom: 0.4rem;
+    width: 100px;
+    height: 100px;
+  }
+  .aoe-diamond-bezel {
+    width: 70px;
+    height: 70px;
+  }
+  .aoe-diamond-inner {
+    width: 105px;
+    height: 105px;
+  }
+  .aoe-recenter-pill {
+    top: -38px;
+    font-size: 0.65rem;
+    padding: 0.25rem 0.65rem;
+  }
+}

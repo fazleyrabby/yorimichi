@@ -61,6 +61,148 @@ export const VISUAL_CONFIG = {
       waterSky: 0x121e38,
     },
   },
+  seasons: {
+    spring: {
+      name: 'SPRING',
+      kanji: '春日和',
+      subtitle: '✦ SPRING BLOSSOMS • SAKURA BREEZE ✦',
+      icon: '🌸',
+      sunColor: 0xfff6ec,
+      sunIntensityMultiplier: 1.0,
+      ambientSkyColor: 0xe0efff,
+      ambientGroundColor: 0x3d5e34,
+      fogColor: 0xd8e4dd,
+      skyTopColor: 0xb5d0dc,
+      skyBottomColor: 0xdae6df,
+      waterDeep: 0x144368,
+      waterShallow: 0x38928e,
+      foliage: {
+        maple: 0x82b544,         // Tender fresh spring green
+        sakura: 0xf5b8c6,        // Full pink blossoms
+        broadleaf: 0x549b3e,     // Fresh spring green
+        pine: 0x224a30,
+        bush: 0x5da845,
+      },
+      terrain: {
+        grassMeadow: 0x54863c,
+        grassLush: 0x3b6b2a,
+        grassDry: 0x889666,
+        cliff: 0xe2ded6,
+        snowWeight: 0.0,
+      },
+      particles: {
+        sakura: 1.0,
+        fireflies: 0.25,
+        leaves: 0.0,
+        snow: 0.0,
+      },
+    },
+    summer: {
+      name: 'SUMMER',
+      kanji: '夏木立',
+      subtitle: '✦ SUMMER MEADOWS • SUNLIT WATERS ✦',
+      icon: '🍃',
+      sunColor: 0xfffaf2,
+      sunIntensityMultiplier: 1.05,
+      ambientSkyColor: 0xd6eaff,
+      ambientGroundColor: 0x365230,
+      fogColor: 0xd4e2dc,
+      skyTopColor: 0xb2cad4,
+      skyBottomColor: 0xd4e2dc,
+      waterDeep: 0x09365e,
+      waterShallow: 0x148390,
+      foliage: {
+        maple: 0x488a32,         // Deep lush summer green
+        sakura: 0x427c2e,        // Green foliage after petals fall
+        broadleaf: 0x4c8f38,
+        pine: 0x224a30,
+        bush: 0x4ea63b,
+      },
+      terrain: {
+        grassMeadow: 0x54863c,
+        grassLush: 0x3b6b2a,
+        grassDry: 0x889666,
+        cliff: 0xe2ded6,
+        snowWeight: 0.0,
+      },
+      particles: {
+        sakura: 0.0,
+        fireflies: 1.0,
+        leaves: 0.0,
+        snow: 0.0,
+      },
+    },
+    autumn: {
+      name: 'AUTUMN',
+      kanji: '秋紅葉',
+      subtitle: '✦ AUTUMN FOLIAGE • GOLDEN HARVEST ✦',
+      icon: '🍁',
+      sunColor: 0xffe6c2,        // Warm golden hour sunlight
+      sunIntensityMultiplier: 0.95,
+      ambientSkyColor: 0xe0dcff,
+      ambientGroundColor: 0x594626,
+      fogColor: 0xdccbb5,        // Smoky golden mountain haze
+      skyTopColor: 0x98a8c4,
+      skyBottomColor: 0xdccbb5,
+      waterDeep: 0x113a52,
+      waterShallow: 0x246b6e,
+      foliage: {
+        maple: 0xbd2a1d,         // Glorious fiery scarlet Momiji
+        sakura: 0xcc6f2f,        // Golden-orange autumn leaves
+        broadleaf: 0xc4822d,     // Rich amber autumn canopy
+        pine: 0x1f3c2a,          // Deep dark conifer
+        bush: 0xaf6829,          // Rustling amber bushes
+      },
+      terrain: {
+        grassMeadow: 0x8f7c46,   // Golden sun-baked meadow
+        grassLush: 0x6e5c32,     // Shaded golden loam
+        grassDry: 0xab8845,      // Dry autumn mountain slopes
+        cliff: 0xd8cebe,
+        snowWeight: 0.0,
+      },
+      particles: {
+        sakura: 0.0,
+        fireflies: 0.35,
+        leaves: 1.0,             // Swirling red/gold leaves
+        snow: 0.0,
+      },
+    },
+    winter: {
+      name: 'WINTER',
+      kanji: '冬景色',
+      subtitle: '✦ WINTER SOLITUDE • GENTLE SNOWFALL ✦',
+      icon: '❄️',
+      sunColor: 0xddeaff,        // Cool pale winter sun
+      sunIntensityMultiplier: 0.88,
+      ambientSkyColor: 0xccdbee,
+      ambientGroundColor: 0x768896,
+      fogColor: 0xcedae4,        // Frosty winter mountain fog
+      skyTopColor: 0x7a8c9e,        // Overcast slate winter sky
+      skyBottomColor: 0xcedae4,
+      waterDeep: 0x0a263c,        // Dark icy blue channel
+      waterShallow: 0x22556b,     // Frosted shallows
+      foliage: {
+        maple: 0x8a9aa6,         // Frosted winter bough with snow blanket
+        sakura: 0x94a4b0,        // Dormant frosted cherry canopy with snow
+        broadleaf: 0x7c8c98,     // Frosted winter deciduous canopy
+        pine: 0x365848,          // Dark winter pine with frosted needles
+        bush: 0x9eb0bc,          // Snow-covered garden shrubs
+      },
+      terrain: {
+        grassMeadow: 0xdde8f0,   // Powder snow meadows
+        grassLush: 0xc5d6e2,     // Deep valley snowdrift
+        grassDry: 0xeaf2f8,      // Crisp white mountain peak snow
+        cliff: 0xd4e0e8,         // Snow-dusted rocks
+        snowWeight: 1.0,         // Full winter snow
+      },
+      particles: {
+        sakura: 0.0,
+        fireflies: 0.0,
+        leaves: 0.0,
+        snow: 1.0,               // Falling 3D snowflakes
+      },
+    },
+  },
   palette: {
     // Nocturnal lanterns & fireflies
     lanternFlame: 0xffa034,

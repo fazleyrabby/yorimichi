@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { WORLD_CONFIG } from '../config/world';
+import { Season } from '../types';
 
 /**
  * 100% Procedural Web Audio Soundscape for Yorimichi
@@ -10,12 +11,14 @@ export class SoundSystem {
   private ctx: AudioContext | null = null;
   private isUnlocked = false;
   private isMuted = false;
+  private currentSeason: Season = 'spring';
 
   // Master Gain
   private masterGain!: GainNode;
 
   // Continuous Ambient Nodes
   private windGain!: GainNode;
+  private windFilter!: BiquadFilterNode;
   private waterGain!: GainNode;
   private bikeRollGain!: GainNode;
   private bikeRollFilter!: BiquadFilterNode;
@@ -129,6 +132,7 @@ export class SoundSystem {
     filter.type = 'bandpass';
     filter.frequency.value = 420;
     filter.Q.value = 1.4;
+    this.windFilter = filter;
 
     this.windGain = this.ctx.createGain();
     this.windGain.gain.setValueAtTime(0.16, this.ctx.currentTime);
@@ -243,23 +247,24 @@ export class SoundSystem {
     const gain = this.ctx.createGain();
     const filter = this.ctx.createBiquadFilter();
 
-    const baseFreq = isStone ? 180 + Math.random() * 40 : 110 + Math.random() * 30;
-    osc.type = 'triangle';
+    const isSnow = this.currentSeason === 'winter' && !isStone;
+    const baseFreq = isStone ? 180 + Math.random() * 40 : (isSnow ? 70 + Math.random() * 25 : 110 + Math.random() * 30);
+    osc.type = isSnow ? 'sawtooth' : 'triangle';
     osc.frequency.setValueAtTime(baseFreq, now);
-    osc.frequency.exponentialRampToValueAtTime(45, now + 0.08);
+    osc.frequency.exponentialRampToValueAtTime(isSnow ? 30 : 45, now + 0.08);
 
     filter.type = 'lowpass';
-    filter.frequency.value = isStone ? 550 : 320;
+    filter.frequency.value = isStone ? 550 : (isSnow ? 260 : 320);
 
-    gain.gain.setValueAtTime(0.12 + Math.random() * 0.04, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    gain.gain.setValueAtTime((isSnow ? 0.09 : 0.12) + Math.random() * 0.03, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + (isSnow ? 0.12 : 0.09));
 
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(this.masterGain);
 
     osc.start(now);
-    osc.stop(now + 0.1);
+    osc.stop(now + (isSnow ? 0.13 : 0.1));
   }
 
   /**
@@ -329,6 +334,22 @@ export class SoundSystem {
     this.nightFactor = THREE.MathUtils.clamp(factor, 0, 1);
   }
 
+  public setSeason(season: Season): void {
+    this.currentSeason = season;
+    if (this.windFilter && this.ctx && this.ctx.state === 'running') {
+      if (season === 'winter') {
+        this.windFilter.frequency.setTargetAtTime(310, this.ctx.currentTime, 0.4);
+        this.windFilter.Q.setTargetAtTime(3.4, this.ctx.currentTime, 0.4);
+      } else if (season === 'autumn') {
+        this.windFilter.frequency.setTargetAtTime(460, this.ctx.currentTime, 0.4);
+        this.windFilter.Q.setTargetAtTime(1.8, this.ctx.currentTime, 0.4);
+      } else {
+        this.windFilter.frequency.setTargetAtTime(420, this.ctx.currentTime, 0.4);
+        this.windFilter.Q.setTargetAtTime(1.4, this.ctx.currentTime, 0.4);
+      }
+    }
+  }
+
   // ==========================================
   // SOUNDSCAPE UPDATE LOOP
   // ==========================================
@@ -339,7 +360,7 @@ export class SoundSystem {
     // 1. Dynamic Mountain Breeze modulation
     if (this.windGain) {
       const gust = Math.sin(time * 0.35) * 0.5 + 0.5;
-      const targetWind = 0.12 + gust * 0.14;
+      const targetWind = (this.currentSeason === 'winter' ? 0.16 : 0.12) + gust * 0.14;
       this.windGain.gain.setTargetAtTime(targetWind, this.ctx.currentTime, 0.4);
     }
 
@@ -353,7 +374,8 @@ export class SoundSystem {
 
       const streamFactor = Math.max(0, 1.0 - distToStream / 25.0);
       const wfFactor = Math.max(0, 1.0 - distToWaterfall / 45.0) * 1.5;
-      const totalWater = Math.min(0.38, (streamFactor * 0.22 + wfFactor * 0.35));
+      const seasonalWaterMult = this.currentSeason === 'winter' ? 0.65 : (this.currentSeason === 'spring' ? 1.15 : 1.0);
+      const totalWater = Math.min(0.38, (streamFactor * 0.22 + wfFactor * 0.35) * seasonalWaterMult);
 
       this.waterGain.gain.setTargetAtTime(totalWater, this.ctx.currentTime, 0.2);
     }
@@ -371,10 +393,11 @@ export class SoundSystem {
       }
     }
 
-    // 4. Procedural Birdsong (Daytime only)
-    if (this.nightFactor < 0.65 && time > this.nextBirdTime) {
+    // 4. Procedural Birdsong (Daytime only, active in Spring, Summer & Autumn)
+    if (this.nightFactor < 0.65 && this.currentSeason !== 'winter' && time > this.nextBirdTime) {
       this.playBirdChirp();
-      this.nextBirdTime = time + 6.0 + Math.random() * 8.0;
+      const interval = this.currentSeason === 'spring' ? 4.0 + Math.random() * 5.0 : 6.0 + Math.random() * 8.0;
+      this.nextBirdTime = time + interval;
     }
 
     // 5. Nocturnal Crickets (Suzumushi chirping at night)

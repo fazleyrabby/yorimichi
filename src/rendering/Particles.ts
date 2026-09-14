@@ -2,26 +2,49 @@ import * as THREE from 'three';
 import { VISUAL_CONFIG } from '../config/visual';
 import { WORLD_CONFIG } from '../config/world';
 
+import { Season } from '../types';
+
 export class ParticleSystem {
   private particles: THREE.Points;
   private petalParticles: THREE.Points;
   private mistParticles: THREE.Points;
   private fireflyParticles!: THREE.Points;
+  private leafParticles!: THREE.Points;
+  private snowParticles!: THREE.Points;
+
   private particleGeo: THREE.BufferGeometry;
   private petalGeo: THREE.BufferGeometry;
   private mistGeo: THREE.BufferGeometry;
   private fireflyGeo!: THREE.BufferGeometry;
+  private leafGeo!: THREE.BufferGeometry;
+  private snowGeo!: THREE.BufferGeometry;
+
+  private petalMat!: THREE.PointsMaterial;
   private fireflyMat!: THREE.PointsMaterial;
+  private leafMat!: THREE.PointsMaterial;
+  private snowMat!: THREE.PointsMaterial;
+
   private positions: Float32Array;
   private petalPositions: Float32Array;
   private mistPositions: Float32Array;
   private fireflyPositions!: Float32Array;
+  private leafPositions!: Float32Array;
+  private snowPositions!: Float32Array;
+
   private fireflyOrigins: Array<{ x: number; y: number; z: number; phase: number; speed: number; range: number }> = [];
   private count = 35;
   private petalCount = 80;
   private mistCount = 60;
   private fireflyCount = 75;
+  private leafCount = 75;
+  private snowCount = 180;
   private nightFactor = 0;
+  private seasonWeights: Record<Season, number> = {
+    spring: 1.0,
+    summer: 0.0,
+    autumn: 0.0,
+    winter: 0.0,
+  };
 
   constructor(scene: THREE.Scene) {
     // 1. Sparse subtle floating motes (clean RTS screen clarity)
@@ -59,7 +82,7 @@ export class ParticleSystem {
 
     this.petalGeo.setAttribute('position', new THREE.BufferAttribute(this.petalPositions, 3));
 
-    const petalMat = new THREE.PointsMaterial({
+    this.petalMat = new THREE.PointsMaterial({
       color: VISUAL_CONFIG.palette.cherryBlossomPetal,
       size: 0.45,
       transparent: true,
@@ -67,7 +90,7 @@ export class ParticleSystem {
       depthWrite: false,
     });
 
-    this.petalParticles = new THREE.Points(this.petalGeo, petalMat);
+    this.petalParticles = new THREE.Points(this.petalGeo, this.petalMat);
     scene.add(this.petalParticles);
 
     // 3. Waterfall Mist (Delicate splash spray localized strictly at impact basins)
@@ -101,7 +124,13 @@ export class ParticleSystem {
     // 4. Bioluminescent Fireflies System (Hotaru)
     this.initFireflies(scene);
 
-    // 5. Ghibli Chimney Smoke System
+    // 5. Autumn Falling Momiji Leaves System
+    this.initAutumnLeaves(scene);
+
+    // 6. Winter Snowfall System
+    this.initSnowfall(scene);
+
+    // 7. Ghibli Chimney Smoke System
     this.initChimneySmoke(scene);
   }
 
@@ -208,10 +237,80 @@ export class ParticleSystem {
     }
   }
 
+  private initAutumnLeaves(scene: THREE.Scene): void {
+    this.leafGeo = new THREE.BufferGeometry();
+    this.leafPositions = new Float32Array(this.leafCount * 3);
+
+    for (let i = 0; i < this.leafCount; i++) {
+      this.leafPositions[i * 3 + 0] = (Math.random() - 0.5) * 115;
+      this.leafPositions[i * 3 + 1] = Math.random() * 15 + 1;
+      this.leafPositions[i * 3 + 2] = (Math.random() - 0.5) * 115;
+    }
+
+    this.leafGeo.setAttribute('position', new THREE.BufferAttribute(this.leafPositions, 3));
+
+    this.leafMat = new THREE.PointsMaterial({
+      color: 0xd94420, // Rich vermilion-scarlet Momiji leaf
+      size: 0.52,
+      transparent: true,
+      opacity: 0.0, // Fades in during Autumn
+      depthWrite: false,
+    });
+
+    this.leafParticles = new THREE.Points(this.leafGeo, this.leafMat);
+    scene.add(this.leafParticles);
+  }
+
+  private initSnowfall(scene: THREE.Scene): void {
+    this.snowGeo = new THREE.BufferGeometry();
+    this.snowPositions = new Float32Array(this.snowCount * 3);
+
+    for (let i = 0; i < this.snowCount; i++) {
+      this.snowPositions[i * 3 + 0] = (Math.random() - 0.5) * 130;
+      this.snowPositions[i * 3 + 1] = Math.random() * 18 + 0.5;
+      this.snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 130;
+    }
+
+    this.snowGeo.setAttribute('position', new THREE.BufferAttribute(this.snowPositions, 3));
+
+    this.snowMat = new THREE.PointsMaterial({
+      color: 0xf6faff, // Soft crystalline white snowflake
+      size: 0.38,
+      transparent: true,
+      opacity: 0.0, // Fades in during Winter
+      depthWrite: false,
+    });
+
+    this.snowParticles = new THREE.Points(this.snowGeo, this.snowMat);
+    scene.add(this.snowParticles);
+  }
+
+  public setSeasonBlend(fromSeason: Season, toSeason: Season, factor: number): void {
+    const f = THREE.MathUtils.clamp(factor, 0, 1);
+    const seasons: Season[] = ['spring', 'summer', 'autumn', 'winter'];
+    for (const s of seasons) {
+      const fromW = s === fromSeason ? 1 - f : 0;
+      const toW = s === toSeason ? f : 0;
+      this.seasonWeights[s] = fromW + toW;
+    }
+
+    // Apply opacities according to active seasons
+    if (this.petalMat) {
+      this.petalMat.opacity = 0.75 * this.seasonWeights.spring;
+    }
+    if (this.leafMat) {
+      this.leafMat.opacity = 0.85 * this.seasonWeights.autumn;
+    }
+    if (this.snowMat) {
+      this.snowMat.opacity = 0.90 * this.seasonWeights.winter;
+    }
+  }
+
   public setDayNightBlend(factor: number): void {
     this.nightFactor = THREE.MathUtils.clamp(factor, 0, 1);
-    // Fireflies emerge gracefully as evening approaches
-    const fireflyOpacity = Math.max(0, (this.nightFactor - 0.20) / 0.80);
+    // Fireflies emerge gracefully as evening approaches (especially in summer & warm seasons)
+    const seasonalFireflyMultiplier = (this.seasonWeights.summer * 1.0 + this.seasonWeights.autumn * 0.35 + this.seasonWeights.spring * 0.25);
+    const fireflyOpacity = Math.max(0, (this.nightFactor - 0.20) / 0.80) * seasonalFireflyMultiplier;
     this.fireflyMat.opacity = fireflyOpacity * 0.92;
   }
 
@@ -224,19 +323,53 @@ export class ParticleSystem {
     }
     this.particleGeo.attributes.position.needsUpdate = true;
 
-    // Animate cherry blossom petals
-    for (let i = 0; i < this.petalCount; i++) {
-      this.petalPositions[i * 3 + 1] -= delta * 0.85;
-      this.petalPositions[i * 3 + 0] += Math.sin(time * 1.5 + i) * 0.025 + 0.015;
-      this.petalPositions[i * 3 + 2] += Math.cos(time * 1.2 + i) * 0.015;
+    // Animate cherry blossom petals (Spring)
+    if (this.petalMat && this.petalMat.opacity > 0.01) {
+      for (let i = 0; i < this.petalCount; i++) {
+        this.petalPositions[i * 3 + 1] -= delta * 0.85;
+        this.petalPositions[i * 3 + 0] += Math.sin(time * 1.5 + i) * 0.025 + 0.015;
+        this.petalPositions[i * 3 + 2] += Math.cos(time * 1.2 + i) * 0.015;
 
-      if (this.petalPositions[i * 3 + 1] < 0.5) {
-        this.petalPositions[i * 3 + 1] = 12.0;
-        this.petalPositions[i * 3 + 0] = -25 + (Math.random() - 0.5) * 35;
-        this.petalPositions[i * 3 + 2] = -18 + (Math.random() - 0.5) * 35;
+        if (this.petalPositions[i * 3 + 1] < 0.5) {
+          this.petalPositions[i * 3 + 1] = 12.0;
+          this.petalPositions[i * 3 + 0] = -25 + (Math.random() - 0.5) * 35;
+          this.petalPositions[i * 3 + 2] = -18 + (Math.random() - 0.5) * 35;
+        }
       }
+      this.petalGeo.attributes.position.needsUpdate = true;
     }
-    this.petalGeo.attributes.position.needsUpdate = true;
+
+    // Animate falling Momiji autumn leaves (Autumn)
+    if (this.leafMat && this.leafMat.opacity > 0.01) {
+      for (let i = 0; i < this.leafCount; i++) {
+        this.leafPositions[i * 3 + 1] -= delta * 0.95;
+        this.leafPositions[i * 3 + 0] += Math.sin(time * 1.8 + i * 1.4) * 0.04 + 0.025;
+        this.leafPositions[i * 3 + 2] += Math.cos(time * 1.4 + i * 1.1) * 0.03 - 0.015;
+
+        if (this.leafPositions[i * 3 + 1] < 0.5) {
+          this.leafPositions[i * 3 + 1] = 14.5;
+          this.leafPositions[i * 3 + 0] = (Math.random() - 0.5) * 115;
+          this.leafPositions[i * 3 + 2] = (Math.random() - 0.5) * 115;
+        }
+      }
+      this.leafGeo.attributes.position.needsUpdate = true;
+    }
+
+    // Animate gentle snowfall (Winter)
+    if (this.snowMat && this.snowMat.opacity > 0.01) {
+      for (let i = 0; i < this.snowCount; i++) {
+        this.snowPositions[i * 3 + 1] -= delta * 1.55;
+        this.snowPositions[i * 3 + 0] += Math.sin(time * 1.2 + i * 0.7) * 0.02 + 0.01;
+        this.snowPositions[i * 3 + 2] += Math.cos(time * 1.0 + i * 0.9) * 0.02;
+
+        if (this.snowPositions[i * 3 + 1] < 0.5) {
+          this.snowPositions[i * 3 + 1] = 18.0;
+          this.snowPositions[i * 3 + 0] = (Math.random() - 0.5) * 130;
+          this.snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 130;
+        }
+      }
+      this.snowGeo.attributes.position.needsUpdate = true;
+    }
 
     // Animate delicate waterfall mist spray
     const wfPos = WORLD_CONFIG.landmarks.waterfall.position;

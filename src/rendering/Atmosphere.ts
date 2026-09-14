@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { VISUAL_CONFIG } from '../config/visual';
+import { Season } from '../types';
 
 export class AtmosphereSystem {
   private scene: THREE.Scene;
@@ -87,15 +88,36 @@ export class AtmosphereSystem {
     this.scene.add(this.starPoints);
   }
 
-  public setDayNightBlend(nightFactor: number): void {
-    const factor = THREE.MathUtils.clamp(nightFactor, 0, 1);
-    const day = VISUAL_CONFIG.dayNight.day;
-    const night = VISUAL_CONFIG.dayNight.night;
+  private nightFactor = 0;
+  private fromSeason: Season = 'spring';
+  private toSeason: Season = 'spring';
+  private seasonFactor = 0;
 
-    // Blend fog and background color
-    const dayFog = new THREE.Color(day.fogColor);
-    const nightFog = new THREE.Color(night.fogColor);
-    const currentFog = new THREE.Color().copy(dayFog).lerp(nightFog, factor);
+  public setSeasonBlend(fromSeason: Season, toSeason: Season, factor: number): void {
+    this.fromSeason = fromSeason;
+    this.toSeason = toSeason;
+    this.seasonFactor = THREE.MathUtils.clamp(factor, 0, 1);
+    this.updateAtmosphere();
+  }
+
+  public setDayNightBlend(nightFactor: number): void {
+    this.nightFactor = THREE.MathUtils.clamp(nightFactor, 0, 1);
+    this.updateAtmosphere();
+  }
+
+  private updateAtmosphere(): void {
+    const sFrom = VISUAL_CONFIG.seasons[this.fromSeason];
+    const sTo = VISUAL_CONFIG.seasons[this.toSeason];
+    const sf = this.seasonFactor;
+
+    // 1. Compute seasonal daytime colors
+    const seasonFog = new THREE.Color(sFrom.fogColor).lerp(new THREE.Color(sTo.fogColor), sf);
+    const seasonSkyTop = new THREE.Color(sFrom.skyTopColor).lerp(new THREE.Color(sTo.skyTopColor), sf);
+    const seasonSkyBottom = new THREE.Color(sFrom.skyBottomColor).lerp(new THREE.Color(sTo.skyBottomColor), sf);
+
+    // 2. Blend with Night Mode
+    const night = VISUAL_CONFIG.dayNight.night;
+    const currentFog = seasonFog.lerp(new THREE.Color(night.fogColor), this.nightFactor);
 
     if (this.scene.fog) {
       (this.scene.fog as THREE.Fog).color.copy(currentFog);
@@ -104,17 +126,15 @@ export class AtmosphereSystem {
       (this.scene.background as THREE.Color).copy(currentFog);
     }
 
-    // Blend sky gradient colors
-    const daySkyTop = new THREE.Color(day.skyTopColor);
-    const nightSkyTop = new THREE.Color(night.skyTopColor);
-    this.skyMat.uniforms.topColor.value.copy(daySkyTop).lerp(nightSkyTop, factor);
+    // Blend sky gradient
+    const currentSkyTop = seasonSkyTop.lerp(new THREE.Color(night.skyTopColor), this.nightFactor);
+    const currentSkyBottom = seasonSkyBottom.lerp(new THREE.Color(night.skyBottomColor), this.nightFactor);
 
-    const daySkyBottom = new THREE.Color(day.skyBottomColor);
-    const nightSkyBottom = new THREE.Color(night.skyBottomColor);
-    this.skyMat.uniforms.bottomColor.value.copy(daySkyBottom).lerp(nightSkyBottom, factor);
+    this.skyMat.uniforms.topColor.value.copy(currentSkyTop);
+    this.skyMat.uniforms.bottomColor.value.copy(currentSkyBottom);
 
     // Stars appear as dusk turns to night
-    const starOpacity = Math.max(0, (factor - 0.25) / 0.75);
+    const starOpacity = Math.max(0, (this.nightFactor - 0.25) / 0.75);
     this.starMat.opacity = starOpacity * 0.85;
   }
 }

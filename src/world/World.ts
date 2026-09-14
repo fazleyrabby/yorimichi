@@ -7,7 +7,7 @@ import { Waterfall } from './Waterfall';
 import { RoadSystem } from './Roads';
 import { VegetationSystem } from '../environment/Vegetation';
 import { WORLD_CONFIG } from '../config/world';
-import { TerrainQuery } from '../types';
+import { TerrainQuery, Season } from '../types';
 import { ParticleSystem } from '../rendering/Particles';
 import { VISUAL_CONFIG } from '../config/visual';
 import { ModelLoader } from './ModelLoader';
@@ -276,6 +276,24 @@ export class World implements TerrainQuery {
     this.landmarksGroup.add(fbLantern);
     this.addLanternLight(-2.5, fbY, -19.0);
 
+    // Yukimi-dōrō (Snow-viewing Lantern) at footbridge stream bank
+    ModelLoader.getInstance().load('/models/aoe_yukimi_lantern_01.glb').then(lantern => {
+      const y = this.terrain.getHeightAt(-2.8, -16.8);
+      lantern.position.set(-2.8, y, -16.8);
+      lantern.scale.setScalar(1.2);
+      this.landmarksGroup.add(lantern);
+      this.addLanternLight(-2.8, y + 0.4, -16.8);
+    }).catch(() => {});
+
+    // Yukimi-dōrō (Snow-viewing Lantern) at waterfall plunge pool shore
+    ModelLoader.getInstance().load('/models/aoe_yukimi_lantern_01.glb').then(lantern => {
+      const y = this.terrain.getHeightAt(-4.8, -45.2);
+      lantern.position.set(-4.8, y, -45.2);
+      lantern.scale.setScalar(1.25);
+      this.landmarksGroup.add(lantern);
+      this.addLanternLight(-4.8, y + 0.4, -45.2);
+    }).catch(() => {});
+
     // Stone Bridge Approach Lantern
     const brY = this.terrain.getHeightAt(-3.5, 11.5);
     const brLantern = this.assetGen.createStoneLantern();
@@ -543,6 +561,13 @@ export class World implements TerrainQuery {
     for (const light of this.lanternLights) {
       light.intensity = this.currentLanternIntensity;
     }
+  }
+
+  public setSeasonBlend(fromSeason: Season, toSeason: Season, factor: number): void {
+    this.terrain.setSeasonBlend(fromSeason, toSeason, factor);
+    this.vegetation.setSeasonBlend(fromSeason, toSeason, factor);
+    this.materials.setSeasonBlend(fromSeason, toSeason, factor);
+    this.vegetation.applySeasonToObject(this.landmarksGroup, fromSeason, toSeason, factor);
   }
 
   // TerrainQuery delegation

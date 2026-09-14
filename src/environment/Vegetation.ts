@@ -1,15 +1,93 @@
 import * as THREE from 'three';
 import { MaterialLibrary } from '../rendering/Materials';
 import { AssetGenerator } from './AssetGenerator';
-import { TerrainQuery } from '../types';
+import { TerrainQuery, Season } from '../types';
 import { WORLD_CONFIG } from '../config/world';
+import { VISUAL_CONFIG } from '../config/visual';
 import { ModelLoader } from '../world/ModelLoader';
 import { Terrain } from '../world/Terrain';
+
+// High-fidelity multi-tier foliage shade palettes preserving 3D canopy depth across all four seasons
+const SAKURA_SEASON_COLORS: Record<Season, { deep: number; mid: number; tip: number }> = {
+  spring: {
+    deep: 0xe686a2, // Rich cherry blossom pink undertone
+    mid: 0xfabfd2,  // Soft glowing sakura pink
+    tip: 0xfff0f6,  // Delicate blossom white petals
+  },
+  summer: {
+    deep: 0x2d6628, // Shaded summer foliage undertone
+    mid: 0x489036,  // Vibrant summer cherry tree canopy
+    tip: 0x64ae46,  // Sunlit leaf fringe
+  },
+  autumn: {
+    deep: 0xba521c, // Burnt golden-amber undertone
+    mid: 0xd87226,  // Warm apricot autumn foliage
+    tip: 0xefa23a,  // Sunlit golden leaf tips
+  },
+  winter: {
+    deep: 0x606a74, // Frosted slate-gray winter canopy
+    mid: 0x98aab8,  // Pale blue-gray frost
+    tip: 0xecf4fa,  // Fresh pure snow blanket cap
+  },
+};
+
+const MAPLE_SEASON_COLORS: Record<Season, { deep: number; mid: number; tip: number }> = {
+  spring: {
+    deep: 0x4e8824, // Fresh young sapling green
+    mid: 0x76b632,  // Tender spring chartreuse shoots
+    tip: 0x9eda46,  // Radiant sunlit yellow-green tips
+  },
+  summer: {
+    deep: 0x22561e, // Deep emerald shade
+    mid: 0x367a28,  // Lush summer maple foliage
+    tip: 0x549e36,  // Fresh leafy green rim
+  },
+  autumn: {
+    deep: 0x8e1212, // Deep imperial crimson undertone
+    mid: 0xcc2416,  // Iconic fiery scarlet Momiji
+    tip: 0xf2821e,  // Sunlit amber-orange fiery leaf tips
+  },
+  winter: {
+    deep: 0x544e48, // Dormant winter wood-brown undertone
+    mid: 0x86949e,  // Frosted dormant branch boughs
+    tip: 0xecf4fa,  // Crisp snow blankets catching on fan plates
+  },
+};
+
+const PINE_SEASON_COLORS: Record<Season, { deep: number; mid: number; tip: number }> = {
+  spring: {
+    deep: 0x163420, // Deep shadowed conifer base
+    mid: 0x245232,  // Fresh mountain pine needle
+    tip: 0x3c7c48,  // Bright spring new-growth needle tip
+  },
+  summer: {
+    deep: 0x122a1a, // Saturated alpine forest shade
+    mid: 0x1e482a,  // Deep summer evergreen needle
+    tip: 0x2e663a,  // Sun-warmed needle tip
+  },
+  autumn: {
+    deep: 0x102416, // Dignified dark evergreen contrast
+    mid: 0x183c24,  // Deep autumn pine
+    tip: 0x265032,  // Muted crisp autumn needle
+  },
+  winter: {
+    deep: 0x183024, // Cold dark winter evergreen bough
+    mid: 0x3e6452,  // Frost-rimmed needle bough
+    tip: 0xecf5fc,  // Snow-capped apex spire & snowy bough tips
+  },
+};
 
 export class VegetationSystem {
   public group: THREE.Group;
   private assetGen: AssetGenerator;
   private terrain: TerrainQuery;
+  private currentSeasonBlend: { from: Season; to: Season; factor: number } = {
+    from: 'spring',
+    to: 'spring',
+    factor: 1.0,
+  };
+  private c1 = new THREE.Color();
+  private c2 = new THREE.Color();
 
   // Paths to high-fidelity Blender 3D models inspired by Age of Empires III: Definitive Edition
   private static readonly MODEL_PINE_TALL = '/models/aoe_pine_tall_01.glb';
@@ -59,6 +137,8 @@ export class VegetationSystem {
       tree.rotation.y = rotY !== undefined ? rotY : Math.random() * Math.PI * 2;
       tree.scale.setScalar(scale);
       this.group.add(tree);
+      // Immediately apply active season colors so newly placed trees never display wrong default colors
+      this.applySeasonToObject(tree, this.currentSeasonBlend.from, this.currentSeasonBlend.to, this.currentSeasonBlend.factor);
     }).catch(err => {
       console.warn(`[VegetationSystem] Error placing tree from ${modelPath}:`, err);
     });
@@ -436,5 +516,86 @@ export class VegetationSystem {
     checkSpline((roads as any).viewpointPath);
 
     return minDist;
+  }
+
+  public setSeasonBlend(fromSeason: Season, toSeason: Season, factor: number): void {
+    this.currentSeasonBlend = { from: fromSeason, to: toSeason, factor };
+    this.applySeasonToObject(this.group, fromSeason, toSeason, factor);
+  }
+
+  public applySeasonToObject(root: THREE.Object3D, fromSeason: Season, toSeason: Season, factor: number): void {
+    const t = THREE.MathUtils.clamp(factor, 0, 1);
+
+    root.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.material) return;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const mat of mats) {
+          const m = mat as THREE.MeshStandardMaterial;
+          if (!m.name) continue;
+          const n = m.name.toLowerCase();
+
+          // CRITICAL: Preserve wood trunks, bark, and branches from being tinted with foliage colors!
+          if (n.includes('bark') || n.includes('trunk') || n.includes('wood') || n.includes('branch') || n.includes('log')) {
+            continue;
+          }
+
+          // 1. Sakura Cherry Blossom
+          if (n.includes('sakura') || n.includes('cherry')) {
+            const from = SAKURA_SEASON_COLORS[fromSeason];
+            const to = SAKURA_SEASON_COLORS[toSeason];
+            if (n.includes('white') || n.includes('tip') || n.includes('high')) {
+              this.c1.set(from.tip); this.c2.set(to.tip);
+            } else if (n.includes('light') || n.includes('mid')) {
+              this.c1.set(from.mid); this.c2.set(to.mid);
+            } else {
+              this.c1.set(from.deep); this.c2.set(to.deep);
+            }
+            m.color.copy(this.c1).lerp(this.c2, t);
+            continue;
+          }
+
+          // 2. Japanese Maple (Momiji)
+          if (n.includes('maple') || n.includes('momiji')) {
+            const from = MAPLE_SEASON_COLORS[fromSeason];
+            const to = MAPLE_SEASON_COLORS[toSeason];
+            if (n.includes('amber') || n.includes('tip') || n.includes('high')) {
+              this.c1.set(from.tip); this.c2.set(to.tip);
+            } else if (n.includes('scarlet') || n.includes('mid')) {
+              this.c1.set(from.mid); this.c2.set(to.mid);
+            } else {
+              this.c1.set(from.deep); this.c2.set(to.deep);
+            }
+            m.color.copy(this.c1).lerp(this.c2, t);
+            continue;
+          }
+
+          // 3. Alpine Pine, Spruce, Cypress
+          if (n.includes('needle') || n.includes('pine') || n.includes('spruce') || n.includes('cypress')) {
+            const from = PINE_SEASON_COLORS[fromSeason];
+            const to = PINE_SEASON_COLORS[toSeason];
+            if (n.includes('tip') || n.includes('sunlit') || n.includes('light')) {
+              this.c1.set(from.tip); this.c2.set(to.tip);
+            } else if (n.includes('mid') || n.includes('spruce') || n.includes('lush')) {
+              this.c1.set(from.mid); this.c2.set(to.mid);
+            } else {
+              this.c1.set(from.deep); this.c2.set(to.deep);
+            }
+            m.color.copy(this.c1).lerp(this.c2, t);
+            continue;
+          }
+
+          // 4. General Broadleaf Foliage / Hedges / Bushes
+          if (n.includes('leaf') || n.includes('foliage') || n.includes('canopy') || n.includes('hedge') || n.includes('bush')) {
+            const fromF = VISUAL_CONFIG.seasons[fromSeason].foliage;
+            const toF = VISUAL_CONFIG.seasons[toSeason].foliage;
+            this.c1.set(fromF.broadleaf);
+            this.c2.set(toF.broadleaf);
+            m.color.copy(this.c1).lerp(this.c2, t);
+          }
+        }
+      }
+    });
   }
 }
