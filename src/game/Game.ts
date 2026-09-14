@@ -377,27 +377,61 @@ export class Game {
     const el = document.getElementById('aoe-visitor-count');
     if (!el) return;
 
-    const NAMESPACE = 'yorimichi-experience';
-    const KEY = 'pilgrims';
-    const SESSION_KEY = 'yorimichi_visited_session';
+    // ── Config ────────────────────────────────────────────────────────────────
+    // Served via Cloudflare Tunnel — no open ports, HTTPS automatic.
+    const BASE_URL = 'https://views.fazleyrabbi.xyz';
+    const PROJECT  = 'yorimichi';
+    const KEY      = 'visitors';
 
-    // Check if the user already visited during this browser session
-    const hasVisited = sessionStorage.getItem(SESSION_KEY);
-    const endpoint = hasVisited
-      ? `https://api.counterapi.dev/v1/${NAMESPACE}/${KEY}`
-      : `https://api.counterapi.dev/v1/${NAMESPACE}/${KEY}/up`;
+    // ── Dev-mode bypass ───────────────────────────────────────────────────────
+    // Run in console to suppress your own counts permanently on this browser:
+    //   localStorage.setItem('yorimichi_dev', '1')
+    // Run to re-enable:
+    //   localStorage.removeItem('yorimichi_dev')
+    const isDev = localStorage.getItem('yorimichi_dev') === '1'
+      || (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
+
+    // ── Session deduplication ─────────────────────────────────────────────────
+    // Even for real visitors: only hit the increment endpoint once per tab
+    // session. Subsequent page interactions just fetch the current count.
+    const SESSION_KEY  = 'yorimichi_visited';
+    const alreadyHit   = sessionStorage.getItem(SESSION_KEY) === '1';
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (isDev) {
+      // Server already handles this header — silently skips increment,
+      // still returns current count so the UI shows a real number.
+      headers['X-Ignore-Analytics'] = 'true';
+    }
 
     try {
-      const res = await fetch(endpoint);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data && typeof data.count === 'number') {
-        el.textContent = Number(data.count).toLocaleString();
-        sessionStorage.setItem(SESSION_KEY, 'true');
+      let views: number | null = null;
+
+      if (!alreadyHit && !isDev) {
+        // First real visit this session — increment
+        const hitUrl = `${BASE_URL}/api/hit?project=${PROJECT}&key=${KEY}`;
+        const res = await fetch(hitUrl, { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (typeof data.views === 'number') {
+          views = data.views;
+          sessionStorage.setItem(SESSION_KEY, '1');
+        }
+      } else {
+        // Dev mode or already counted — read-only fetch
+        const getUrl = `${BASE_URL}/api/get?project=${PROJECT}&key=${KEY}`;
+        const res = await fetch(getUrl, { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (typeof data.views === 'number') views = data.views;
+      }
+
+      if (views !== null) {
+        el.textContent = views.toLocaleString();
       }
     } catch {
-      // Fallback display if offline or API blocked
-      el.textContent = '1,280+';
+      // Counter offline or network issue — show a neutral fallback
+      el.textContent = '—';
     }
   }
 
